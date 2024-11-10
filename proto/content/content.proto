@@ -1,0 +1,195 @@
+syntax = "proto3";
+
+package content;
+
+option go_package = "proto/content";
+
+service ContentService {
+    rpc PostQuestion(PostQuestionRequest) returns (PostQuestionResponse);
+    rpc GetQuestionsByUserID(GetQuestionsByUserIDRequest) returns (GetQuestionsByUserIDResponse);
+    rpc GetQuestionsByTags(GetQuestionsByTagsRequest) returns (GetQuestionsByTagsResponse);
+    rpc GetQuestionsByWord(GetQuestionsByWordRequest) returns (GetQuestionsByWordResponse);
+    rpc DeleteQuestion(DeleteQuestionRequest) returns (DeleteQuestionResponse);
+    rpc GetQuestionByID(GetQuestionByIDRequest) returns (GetQuestionByIDResponse);
+    rpc PostAnswerByQuestionID(PostAnswerByQuestionIDRequest) returns (PostAnswerByQuestionIDResponse);
+    rpc DeleteAnswerByAnswerID(DeleteAnswerByAnswerIDRequest) returns (DeleteAnswerByAnswerIDResponse);
+    rpc UpvoteAnswerByAnswerID(UpvoteAnswerByAnswerIDRequest) returns (UpvoteAnswerByAnswerIDResponse);
+    rpc DownvoteAnswerByAnswerID(DownvoteAnswerByAnswerIDRequest) returns (DownvoteAnswerByAnswerIDResponse);
+    rpc FlagQuestion(FlagQuestionRequest) returns (FlagQuestionResponse);
+    rpc FlagAnswer(FlagAnswerRequest) returns (FlagAnswerResponse);
+    rpc MarkQuestionAsAnswered(MarkQuestionAsAnsweredRequest) returns (MarkQuestionAsAnsweredResponse);
+    rpc GetUserFeed(GetUserFeedRequest) returns (GetUserFeedResponse); 
+    rpc AddTag(AddTagRequest) returns (AddTagResponse); 
+    rpc RemoveTag(RemoveTagRequest) returns (RemoveTagResponse); 
+    rpc SearchQuestionsAnswersUsers(SearchRequest) returns (SearchResponse); 
+}
+
+message PostQuestionRequest {
+    string question = 1;
+    string userID = 2; 
+    int64 createdAt = 3; 
+    repeated string tags = 4; 
+}
+
+message PostQuestionResponse {
+    bool success = 1; 
+    string message = 2; 
+}
+
+message GetQuestionsByUserIDRequest {
+    string userID = 1; 
+}
+
+message GetQuestionsByUserIDResponse {
+    repeated Question questions = 1; 
+}
+
+message GetQuestionsByTagsRequest {
+    repeated string tags = 1; 
+}
+
+message GetQuestionsByTagsResponse {
+    repeated Question questions = 1; 
+}
+
+message GetQuestionsByWordRequest {
+    string searchWord = 1; 
+}
+
+message GetQuestionsByWordResponse {
+    repeated Question questions = 1; 
+}
+
+message DeleteQuestionRequest {
+    string questionID = 1; 
+}
+
+message DeleteQuestionResponse {
+    bool success = 1; 
+    string message = 2; 
+}
+
+message GetQuestionByIDRequest {
+    string questionID = 1; 
+}
+
+message GetQuestionByIDResponse {
+    Question question = 1; 
+}
+
+message PostAnswerByQuestionIDRequest {
+    string questionID = 1; 
+    string answer = 2; 
+    string userID = 3; 
+}
+
+message PostAnswerByQuestionIDResponse {
+    bool success = 1; 
+    string message = 2; 
+}
+
+message DeleteAnswerByAnswerIDRequest {
+    string questionID =1;
+    string answerID = 2; 
+}
+
+message DeleteAnswerByAnswerIDResponse {
+    bool success = 1; 
+    string message = 2; 
+}
+
+message UpvoteAnswerByAnswerIDRequest {
+    string questionId = 1;
+    string answerID = 2; 
+}
+
+message UpvoteAnswerByAnswerIDResponse {
+    bool success = 1; 
+    string message = 2; 
+}
+
+message DownvoteAnswerByAnswerIDRequest {
+    string questionID = 1;
+    string answerID = 2; 
+}
+
+message DownvoteAnswerByAnswerIDResponse {
+    bool success = 1; 
+    string message = 2; 
+}
+
+message FlagQuestionRequest {
+    string questionID = 1; 
+    string userID = 2; 
+    string reason = 3; 
+}
+
+message FlagQuestionResponse {
+    bool success = 1; 
+    string message = 2; 
+}
+
+message FlagAnswerRequest {
+    string questionID = 1;
+    string answerID = 2; 
+    string userID = 3; 
+    string reason = 4; 
+}
+
+message FlagAnswerResponse {
+    bool success = 1; 
+    string message = 2; 
+}
+
+message MarkQuestionAsAnsweredRequest {
+    string questionID = 1; 
+}
+
+message MarkQuestionAsAnsweredResponse {
+    bool success = 1; 
+    string message = 2; 
+}
+
+message Question {
+    string questionID = 1; 
+    string question = 2; 
+    string userID = 3; 
+    int64 createdAt = 4; 
+    repeated string tags = 5; 
+    bool isAnswered = 6; 
+}
+
+message GetUserFeedRequest {
+    string userID = 1; 
+}
+
+message GetUserFeedResponse {
+    repeated Question questions = 1; 
+}
+
+message AddTagRequest {
+    string tagName = 1; 
+}
+
+message AddTagResponse {
+    bool success = 1; 
+    string message = 2; 
+}
+
+message RemoveTagRequest {
+    string tagName = 1; 
+}
+
+message RemoveTagResponse {
+    bool success = 1; 
+    string message = 2; 
+}
+
+message SearchRequest {
+    string keyword = 1; 
+}
+
+message SearchResponse {
+    repeated Question questions = 1; 
+    
+}
