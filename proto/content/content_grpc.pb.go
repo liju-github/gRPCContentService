@@ -32,6 +32,8 @@ const (
 	ContentService_FlagQuestion_FullMethodName                = "/content.ContentService/FlagQuestion"
 	ContentService_FlagAnswer_FullMethodName                  = "/content.ContentService/FlagAnswer"
 	ContentService_MarkQuestionAsAnswered_FullMethodName      = "/content.ContentService/MarkQuestionAsAnswered"
+	ContentService_GetFlaggedQuestions_FullMethodName         = "/content.ContentService/GetFlaggedQuestions"
+	ContentService_GetFlaggedAnswers_FullMethodName           = "/content.ContentService/GetFlaggedAnswers"
 	ContentService_GetUserFeed_FullMethodName                 = "/content.ContentService/GetUserFeed"
 	ContentService_AddTag_FullMethodName                      = "/content.ContentService/AddTag"
 	ContentService_RemoveTag_FullMethodName                   = "/content.ContentService/RemoveTag"
@@ -55,6 +57,8 @@ type ContentServiceClient interface {
 	FlagQuestion(ctx context.Context, in *FlagQuestionRequest, opts ...grpc.CallOption) (*FlagQuestionResponse, error)
 	FlagAnswer(ctx context.Context, in *FlagAnswerRequest, opts ...grpc.CallOption) (*FlagAnswerResponse, error)
 	MarkQuestionAsAnswered(ctx context.Context, in *MarkQuestionAsAnsweredRequest, opts ...grpc.CallOption) (*MarkQuestionAsAnsweredResponse, error)
+	GetFlaggedQuestions(ctx context.Context, in *GetFlaggedQuestionsRequest, opts ...grpc.CallOption) (*GetFlaggedQuestionsResponse, error)
+	GetFlaggedAnswers(ctx context.Context, in *GetFlaggedAnswersRequest, opts ...grpc.CallOption) (*GetFlaggedAnswersResponse, error)
 	GetUserFeed(ctx context.Context, in *GetUserFeedRequest, opts ...grpc.CallOption) (*GetUserFeedResponse, error)
 	AddTag(ctx context.Context, in *AddTagRequest, opts ...grpc.CallOption) (*AddTagResponse, error)
 	RemoveTag(ctx context.Context, in *RemoveTagRequest, opts ...grpc.CallOption) (*RemoveTagResponse, error)
@@ -199,6 +203,26 @@ func (c *contentServiceClient) MarkQuestionAsAnswered(ctx context.Context, in *M
 	return out, nil
 }
 
+func (c *contentServiceClient) GetFlaggedQuestions(ctx context.Context, in *GetFlaggedQuestionsRequest, opts ...grpc.CallOption) (*GetFlaggedQuestionsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetFlaggedQuestionsResponse)
+	err := c.cc.Invoke(ctx, ContentService_GetFlaggedQuestions_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *contentServiceClient) GetFlaggedAnswers(ctx context.Context, in *GetFlaggedAnswersRequest, opts ...grpc.CallOption) (*GetFlaggedAnswersResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetFlaggedAnswersResponse)
+	err := c.cc.Invoke(ctx, ContentService_GetFlaggedAnswers_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *contentServiceClient) GetUserFeed(ctx context.Context, in *GetUserFeedRequest, opts ...grpc.CallOption) (*GetUserFeedResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetUserFeedResponse)
@@ -256,6 +280,8 @@ type ContentServiceServer interface {
 	FlagQuestion(context.Context, *FlagQuestionRequest) (*FlagQuestionResponse, error)
 	FlagAnswer(context.Context, *FlagAnswerRequest) (*FlagAnswerResponse, error)
 	MarkQuestionAsAnswered(context.Context, *MarkQuestionAsAnsweredRequest) (*MarkQuestionAsAnsweredResponse, error)
+	GetFlaggedQuestions(context.Context, *GetFlaggedQuestionsRequest) (*GetFlaggedQuestionsResponse, error)
+	GetFlaggedAnswers(context.Context, *GetFlaggedAnswersRequest) (*GetFlaggedAnswersResponse, error)
 	GetUserFeed(context.Context, *GetUserFeedRequest) (*GetUserFeedResponse, error)
 	AddTag(context.Context, *AddTagRequest) (*AddTagResponse, error)
 	RemoveTag(context.Context, *RemoveTagRequest) (*RemoveTagResponse, error)
@@ -308,6 +334,12 @@ func (UnimplementedContentServiceServer) FlagAnswer(context.Context, *FlagAnswer
 }
 func (UnimplementedContentServiceServer) MarkQuestionAsAnswered(context.Context, *MarkQuestionAsAnsweredRequest) (*MarkQuestionAsAnsweredResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method MarkQuestionAsAnswered not implemented")
+}
+func (UnimplementedContentServiceServer) GetFlaggedQuestions(context.Context, *GetFlaggedQuestionsRequest) (*GetFlaggedQuestionsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetFlaggedQuestions not implemented")
+}
+func (UnimplementedContentServiceServer) GetFlaggedAnswers(context.Context, *GetFlaggedAnswersRequest) (*GetFlaggedAnswersResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetFlaggedAnswers not implemented")
 }
 func (UnimplementedContentServiceServer) GetUserFeed(context.Context, *GetUserFeedRequest) (*GetUserFeedResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetUserFeed not implemented")
@@ -576,6 +608,42 @@ func _ContentService_MarkQuestionAsAnswered_Handler(srv interface{}, ctx context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ContentService_GetFlaggedQuestions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetFlaggedQuestionsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ContentServiceServer).GetFlaggedQuestions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ContentService_GetFlaggedQuestions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ContentServiceServer).GetFlaggedQuestions(ctx, req.(*GetFlaggedQuestionsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ContentService_GetFlaggedAnswers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetFlaggedAnswersRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ContentServiceServer).GetFlaggedAnswers(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ContentService_GetFlaggedAnswers_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ContentServiceServer).GetFlaggedAnswers(ctx, req.(*GetFlaggedAnswersRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _ContentService_GetUserFeed_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetUserFeedRequest)
 	if err := dec(in); err != nil {
@@ -706,6 +774,14 @@ var ContentService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "MarkQuestionAsAnswered",
 			Handler:    _ContentService_MarkQuestionAsAnswered_Handler,
+		},
+		{
+			MethodName: "GetFlaggedQuestions",
+			Handler:    _ContentService_GetFlaggedQuestions_Handler,
+		},
+		{
+			MethodName: "GetFlaggedAnswers",
+			Handler:    _ContentService_GetFlaggedAnswers_Handler,
 		},
 		{
 			MethodName: "GetUserFeed",

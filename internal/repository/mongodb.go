@@ -1,4 +1,3 @@
-// File: internal/repository/mongodb/repository.go
 package mongodb
 
 import (
@@ -23,21 +22,24 @@ type Repository interface {
 	GetQuestionByID(ctx context.Context, questionID string) (*models.Question, error)
 	PostAnswer(ctx context.Context, questionID string, answer *models.Answer) error
 	DeleteAnswer(ctx context.Context, questionID, answerID string) error
-	UpvoteAnswer(ctx context.Context, questionID, answerID, userID string) error
-	DownvoteAnswer(ctx context.Context, questionID, answerID  string) error
 	FlagQuestion(ctx context.Context, questionID, userID, reason string) error
 	FlagAnswer(ctx context.Context, questionID, answerID, userID, reason string) error
 	MarkQuestionAsAnswered(ctx context.Context, questionID string) error
 	GetUserFeed(ctx context.Context, userID string) ([]models.Question, error)
+	GetFlaggedQuestions(ctx context.Context) ([]models.Question, int32, error)
+	GetFlaggedAnswers(ctx context.Context) ([]models.Answer, int32, error)
+
+	//additional methods...
 	AddTag(ctx context.Context, tag *models.Tag) error
 	RemoveTag(ctx context.Context, tagName string) error
+	UpvoteAnswer(ctx context.Context, questionID, answerID, userID string) error
+	DownvoteAnswer(ctx context.Context, questionID, answerID string) error
 	SearchQuestionsAnswersUsers(ctx context.Context, keyword string) (*models.SearchResult, error)
 	// Additional methods for vote tracking
 	HasUserVotedOnAnswer(ctx context.Context, questionID, answerID, userID string) (bool, string, error)
 	GetAnswerOwnerID(ctx context.Context, questionID, answerID string) (string, error)
 	GetUserIDFromQuestionID(ctx context.Context, questionID string) (string, error)
 }
-
 
 type MongoRepository struct {
 	client    *mongo.Client
@@ -258,7 +260,6 @@ func (r *MongoRepository) DeleteAnswer(ctx context.Context, questionID, answerID
 
 	return nil
 }
-
 
 func (r *MongoRepository) DownvoteAnswer(ctx context.Context, questionID, answerID string) error {
 	qID, err := primitive.ObjectIDFromHex(questionID)
@@ -627,4 +628,66 @@ func (r *MongoRepository) UpvoteAnswer(ctx context.Context, questionID, answerID
 	}
 
 	return nil
+}
+
+func (r *MongoRepository) GetFlaggedQuestions(ctx context.Context) ([]models.Question, int32, error) {
+
+	// Create match stage for flagged questions
+	match := bson.M{"is_flagged": true}
+
+	// Get total count of flagged questions
+	totalCount, err := r.questions.CountDocuments(ctx, match)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	opts := options.Find().
+		SetSort(bson.D{{Key: "created_at", Value: -1}})
+
+	cursor, err := r.questions.Find(ctx, match, opts)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer cursor.Close(ctx)
+
+	var questions []models.Question
+	if err = cursor.All(ctx, &questions); err != nil {
+		return nil, 0, err
+	}
+
+	return questions, int32(totalCount), nil
+}
+
+func (r *MongoRepository) GetFlaggedAnswers(ctx context.Context) ([]models.Answer, int32, error) {
+
+	// Pipeline to unwind answers and match flagged ones
+	pipeline := mongo.Pipeline{
+		{{Key: "$unwind", Value: "$answers"}},
+		{{Key: "$match", Value: bson.M{"answers.is_flagged": true}}},
+		{{Key: "$group", Value: bson.M{
+			"_id":     nil,
+			"total":   bson.M{"$sum": 1},
+			"answers": bson.M{"$push": "$answers"},
+		}}},
+	}
+
+	// Execute pipeline to get total count and answers
+	cursor, err := r.questions.Aggregate(ctx, pipeline)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer cursor.Close(ctx)
+
+	var result struct {
+		Total   int32           `bson:"total"`
+		Answers []models.Answer `bson:"answers"`
+	}
+
+	if cursor.Next(ctx) {
+		if err := cursor.Decode(&result); err != nil {
+			return nil, 0, err
+		}
+	}
+
+	return result.Answers, result.Total, nil
 }
