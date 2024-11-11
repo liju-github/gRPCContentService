@@ -29,6 +29,7 @@ message PostQuestionRequest {
     string userID = 2; 
     int64 createdAt = 3; 
     repeated string tags = 4; 
+    string details = 5;
 }
 
 message PostQuestionResponse {
@@ -62,6 +63,7 @@ message GetQuestionsByWordResponse {
 
 message DeleteQuestionRequest {
     string questionID = 1; 
+    string userID = 2;
 }
 
 message DeleteQuestionResponse {
@@ -75,6 +77,7 @@ message GetQuestionByIDRequest {
 
 message GetQuestionByIDResponse {
     Question question = 1; 
+    repeated Answer answers =2;
 }
 
 message PostAnswerByQuestionIDRequest {
@@ -101,16 +104,19 @@ message DeleteAnswerByAnswerIDResponse {
 message UpvoteAnswerByAnswerIDRequest {
     string questionId = 1;
     string answerID = 2; 
+    string userID = 3;
 }
 
 message UpvoteAnswerByAnswerIDResponse {
     bool success = 1; 
     string message = 2; 
+    
 }
 
 message DownvoteAnswerByAnswerIDRequest {
     string questionID = 1;
     string answerID = 2; 
+    string userID = 3;
 }
 
 message DownvoteAnswerByAnswerIDResponse {
@@ -157,6 +163,18 @@ message Question {
     int64 createdAt = 4; 
     repeated string tags = 5; 
     bool isAnswered = 6; 
+    string details = 7;
+}
+message Answer {
+    string id = 1;                     
+    string questionId = 2;             
+    string userId = 3;                 
+    string answerText = 4;             
+    int32 upvotes = 5;                 
+    int32 downvotes = 6;               
+    bool isFlagged = 7;                
+    int64 createdAt = 8; 
+    int64 updatedAt = 9; 
 }
 
 message GetUserFeedRequest {

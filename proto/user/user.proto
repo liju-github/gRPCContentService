@@ -1,0 +1,112 @@
+syntax = "proto3";
+
+package user;
+option go_package = "proto/user";
+
+service UserService {
+  
+  rpc Register(RegisterRequest) returns (RegisterResponse);
+  rpc Login(LoginRequest) returns (LoginResponse);
+  rpc VerifyEmail(EmailVerificationRequest) returns (EmailVerificationResponse);
+  
+  
+  rpc GetProfile(ProfileRequest) returns (ProfileResponse);
+  rpc UpdateProfile(UpdateProfileRequest) returns (UpdateProfileResponse);
+  rpc GetUserByToken(GetUserByTokenRequest) returns (ProfileResponse);
+  rpc CheckBan(CheckBanRequest) returns (CheckBanResponse);
+}
+
+
+message RegisterRequest {
+  string email = 1;
+  string password = 2;
+  string name = 3;
+  string streetName = 4;
+  string locality = 5;
+  string state = 6;
+  string pincode = 7;
+  string phoneNumber = 8;
+}
+
+message RegisterResponse {
+  bool success = 1;
+  string message = 2;
+  string userId = 3;
+  string verificationCode = 4; 
+}
+
+
+message LoginRequest {
+  string email = 1;
+  string password = 2;
+}
+
+message LoginResponse {
+  bool success = 1;
+  string token = 2;
+  string refreshToken = 3;
+  string userId = 4;
+}
+
+
+message EmailVerificationRequest {
+  string userId = 1;
+  string verificationCode = 2;
+}
+
+message EmailVerificationResponse {
+  bool success = 1;
+  string message = 2;
+  string token = 3; 
+}
+
+
+message ProfileRequest {
+  string userId = 1;
+  string token = 2; 
+}
+
+message ProfileResponse {
+  string userId = 1;
+  string email = 2;
+  string name = 3;
+  int32 reputation = 4;
+  string streetName = 5;
+  string locality = 6;
+  string state = 7;
+  string pincode = 8;
+  string phoneNumber = 9;
+  bool isVerified = 10;
+  bool isBanned = 11;
+}
+
+message UpdateProfileRequest {
+  string userId = 1;
+  string name = 2;
+  string streetName = 3;
+  string locality = 4;
+  string state = 5;
+  string pincode = 6;
+  string phoneNumber = 7;
+}
+
+
+message UpdateProfileResponse {
+  bool success = 1;
+  string message = 2;
+  ProfileResponse profile = 3;
+}
+
+message GetUserByTokenRequest{
+  string token =1;
+}
+
+message CheckBanRequest{
+  string userID = 1;
+  bool BanStatus = 2;
+}
+
+message CheckBanResponse{
+  string userID = 1;
+  bool BanStatus = 2;
+}

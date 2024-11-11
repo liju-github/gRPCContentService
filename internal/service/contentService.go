@@ -1,389 +1,303 @@
+// File: contentService.go
 package service
 
 import (
-	"context"
-	"errors"
-	"time"
+    "context"
+    "errors"
+    "time"
+    "strings"
 
-	"github.com/liju-github/ContentService/internal/models"
-	mongodb "github.com/liju-github/ContentService/internal/repository"
-	contentPB "github.com/liju-github/ContentService/proto/content"
+    "github.com/liju-github/ContentService/internal/models"
+    mongodb "github.com/liju-github/ContentService/internal/repository"
+    contentPB "github.com/liju-github/ContentService/proto/content"
 )
 
 type ContentService struct {
-	contentPB.UnimplementedContentServiceServer
-	repo mongodb.Repository
+    contentPB.UnimplementedContentServiceServer
+    repo mongodb.Repository
 }
 
 func NewContentService(repo mongodb.Repository) *ContentService {
-	return &ContentService{
-		repo: repo,
-	}
+    return &ContentService{
+        repo: repo,
+    }
 }
 
-// PostQuestion implements the PostQuestion RPC method
 func (s *ContentService) PostQuestion(ctx context.Context, req *contentPB.PostQuestionRequest) (*contentPB.PostQuestionResponse, error) {
-	if req.Question == "" || req.UserID == "" {
-		return &contentPB.PostQuestionResponse{
-			Success: false,
-			Message: "question and user_id are required",
-		}, errors.New("question and user_id are required")
-	}
+    if err := validatePostQuestion(req); err != nil {
+        return &contentPB.PostQuestionResponse{
+            Success: false,
+            Message: err.Error(),
+        }, err
+    }
 
-	question := &models.Question{
-		UserID:     req.UserID,
-		Question:   req.Question,
-		Tags:       req.Tags,
-		CreatedAt:  time.Now(),
-		UpdatedAt:  time.Now(),
-		IsAnswered: false,
-		IsFlagged:  false,
-		Answers:    []models.Answer{},
-		Flags:      []models.Flag{},
-	}
+    question := &models.Question{
+        UserID:     req.UserID,
+        Question:   strings.TrimSpace(req.Question),
+        Details:    strings.TrimSpace(req.Details),
+        Tags:       sanitizeTags(req.Tags),
+        CreatedAt:  time.Now(),
+        UpdatedAt:  time.Now(),
+        IsAnswered: false,
+        IsFlagged:  false,
+        Answers:    []models.Answer{},
+        Flags:      []models.Flag{},
+    }
 
-	err := s.repo.PostQuestion(ctx, question)
-	if err != nil {
-		return &contentPB.PostQuestionResponse{
-			Success: false,
-			Message: "Failed to create question: " + err.Error(),
-		}, err
-	}
+    err := s.repo.PostQuestion(ctx, question)
+    if err != nil {
+        return &contentPB.PostQuestionResponse{
+            Success: false,
+            Message: "Failed to create question: " + err.Error(),
+        }, err
+    }
 
-	return &contentPB.PostQuestionResponse{
-		Success: true,
-		Message: "Question created successfully",
-	}, nil
+    return &contentPB.PostQuestionResponse{
+        Success: true,
+        Message: "Question created successfully",
+    }, nil
 }
 
-// GetQuestionsByUserID implements the GetQuestionsByUserID RPC method
 func (s *ContentService) GetQuestionsByUserID(ctx context.Context, req *contentPB.GetQuestionsByUserIDRequest) (*contentPB.GetQuestionsByUserIDResponse, error) {
-	if req.UserID == "" {
-		return nil, errors.New("user_id is required")
-	}
+    if req.UserID == "" {
+        return nil, errors.New("user_id is required")
+    }
 
-	questions, err := s.repo.GetQuestionsByUserID(ctx, req.UserID)
-	if err != nil {
-		return nil, err
-	}
+    questions, err := s.repo.GetQuestionsByUserID(ctx, req.UserID)
+    if err != nil {
+        return nil, err
+    }
 
-	pbQuestions := make([]*contentPB.Question, len(questions))
-	for i, q := range questions {
-		pbQuestions[i] = &contentPB.Question{
-			QuestionID: q.ID.Hex(),
-			Question:   q.Question,
-			UserID:     q.UserID,
-			CreatedAt:  q.CreatedAt.Unix(),
-			Tags:       q.Tags,
-			IsAnswered: q.IsAnswered,
-		}
-	}
-
-	return &contentPB.GetQuestionsByUserIDResponse{
-		Questions: pbQuestions,
-	}, nil
+    return &contentPB.GetQuestionsByUserIDResponse{
+        Questions: convertToProtoQuestions(questions),
+    }, nil
 }
 
-// GetQuestionsByTags implements the GetQuestionsByTags RPC method
 func (s *ContentService) GetQuestionsByTags(ctx context.Context, req *contentPB.GetQuestionsByTagsRequest) (*contentPB.GetQuestionsByTagsResponse, error) {
-	if len(req.Tags) == 0 {
-		return nil, errors.New("at least one tag is required")
-	}
+    if len(req.Tags) == 0 {
+        return nil, errors.New("at least one tag is required")
+    }
 
-	questions, err := s.repo.GetQuestionsByTags(ctx, req.Tags)
-	if err != nil {
-		return nil, err
-	}
+    questions, err := s.repo.GetQuestionsByTags(ctx, sanitizeTags(req.Tags))
+    if err != nil {
+        return nil, err
+    }
 
-	pbQuestions := make([]*contentPB.Question, len(questions))
-	for i, q := range questions {
-		pbQuestions[i] = &contentPB.Question{
-			QuestionID: q.ID.Hex(),
-			Question:   q.Question,
-			UserID:     q.UserID,
-			CreatedAt:  q.CreatedAt.Unix(),
-			Tags:       q.Tags,
-			IsAnswered: q.IsAnswered,
-		}
-	}
-
-	return &contentPB.GetQuestionsByTagsResponse{
-		Questions: pbQuestions,
-	}, nil
+    return &contentPB.GetQuestionsByTagsResponse{
+        Questions: convertToProtoQuestions(questions),
+    }, nil
 }
 
-// GetQuestionsByWord implements the GetQuestionsByWord RPC method
 func (s *ContentService) GetQuestionsByWord(ctx context.Context, req *contentPB.GetQuestionsByWordRequest) (*contentPB.GetQuestionsByWordResponse, error) {
-	if req.SearchWord == "" {
-		return nil, errors.New("search word is required")
-	}
+    if req.SearchWord == "" {
+        return nil, errors.New("search word is required")
+    }
 
-	questions, err := s.repo.GetQuestionsByWord(ctx, req.SearchWord)
-	if err != nil {
-		return nil, err
-	}
+    questions, err := s.repo.GetQuestionsByWord(ctx, strings.TrimSpace(req.SearchWord))
+    if err != nil {
+        return nil, err
+    }
 
-	pbQuestions := make([]*contentPB.Question, len(questions))
-	for i, q := range questions {
-		pbQuestions[i] = &contentPB.Question{
-			QuestionID: q.ID.Hex(),
-			Question:   q.Question,
-			UserID:     q.UserID,
-			CreatedAt:  q.CreatedAt.Unix(),
-			Tags:       q.Tags,
-			IsAnswered: q.IsAnswered,
-		}
-	}
-
-	return &contentPB.GetQuestionsByWordResponse{
-		Questions: pbQuestions,
-	}, nil
+    return &contentPB.GetQuestionsByWordResponse{
+        Questions: convertToProtoQuestions(questions),
+    }, nil
 }
 
-// DeleteQuestion implements the DeleteQuestion RPC method
 func (s *ContentService) DeleteQuestion(ctx context.Context, req *contentPB.DeleteQuestionRequest) (*contentPB.DeleteQuestionResponse, error) {
-	if req.QuestionID == "" {
-		return &contentPB.DeleteQuestionResponse{
-			Success: false,
-			Message: "question_id is required",
-		}, errors.New("question_id is required")
-	}
+    if req.QuestionID == "" || req.UserID == "" {
+        return &contentPB.DeleteQuestionResponse{
+            Success: false,
+            Message: "question_id and user_id are required",
+        }, errors.New("question_id and user_id are required")
+    }
 
-	err := s.repo.DeleteQuestion(ctx, req.QuestionID)
-	if err != nil {
-		return &contentPB.DeleteQuestionResponse{
-			Success: false,
-			Message: "Failed to delete question: " + err.Error(),
-		}, err
-	}
+    // Verify user owns the question
+    questionOwnerID, err := s.repo.GetUserIDFromQuestionID(ctx, req.QuestionID)
+    if err != nil {
+        return &contentPB.DeleteQuestionResponse{
+            Success: false,
+            Message: "Failed to verify question ownership",
+        }, err
+    }
 
-	return &contentPB.DeleteQuestionResponse{
-		Success: true,
-		Message: "Question deleted successfully",
-	}, nil
+    if questionOwnerID != req.UserID {
+        return &contentPB.DeleteQuestionResponse{
+            Success: false,
+            Message: "Unauthorized: only question owner can delete the question",
+        }, errors.New("unauthorized deletion attempt")
+    }
+
+    err = s.repo.DeleteQuestion(ctx, req.QuestionID)
+    if err != nil {
+        return &contentPB.DeleteQuestionResponse{
+            Success: false,
+            Message: "Failed to delete question: " + err.Error(),
+        }, err
+    }
+
+    return &contentPB.DeleteQuestionResponse{
+        Success: true,
+        Message: "Question deleted successfully",
+    }, nil
 }
 
-// GetQuestionByID implements the GetQuestionByID RPC method
-func (s *ContentService) GetQuestionByID(ctx context.Context, req *contentPB.GetQuestionByIDRequest) (*contentPB.GetQuestionByIDResponse, error) {
-	if req.QuestionID == "" {
-		return nil, errors.New("question_id is required")
-	}
+func (s *ContentService) PostAnswer(ctx context.Context, req *contentPB.PostAnswerByQuestionIDRequest) (*contentPB.PostAnswerByQuestionIDResponse, error) {
+    if err := validatePostAnswer(req); err != nil {
+        return &contentPB.PostAnswerByQuestionIDResponse{
+            Success: false,
+            Message: err.Error(),
+        }, err
+    }
 
-	question, err := s.repo.GetQuestionByID(ctx, req.QuestionID)
-	if err != nil {
-		return nil, err
-	}
+    // Check if user is trying to answer their own question
+    questionOwnerID, err := s.repo.GetUserIDFromQuestionID(ctx, req.QuestionID)
+    if err != nil {
+        return &contentPB.PostAnswerByQuestionIDResponse{
+            Success: false,
+            Message: "Failed to verify question ownership",
+        }, err
+    }
 
-	pbQuestion := &contentPB.Question{
-		QuestionID: question.ID.Hex(),
-		Question:   question.Question,
-		UserID:     question.UserID,
-		CreatedAt:  question.CreatedAt.Unix(),
-		Tags:       question.Tags,
-		IsAnswered: question.IsAnswered,
-	}
+    if questionOwnerID == req.UserID {
+        return &contentPB.PostAnswerByQuestionIDResponse{
+            Success: false,
+            Message: "Cannot answer your own question",
+        }, errors.New("self-answering not allowed")
+    }
 
-	return &contentPB.GetQuestionByIDResponse{
-		Question: pbQuestion,
-	}, nil
+    answer := &models.Answer{
+        UserID:    req.UserID,
+        Answer:    strings.TrimSpace(req.Answer),
+        CreatedAt: time.Now(),
+        UpdatedAt: time.Now(),
+        Upvotes:   0,
+        Downvotes: 0,
+        IsFlagged: false,
+        Vote:   []models.Vote{},
+        Flags:     []models.Flag{},
+    }
+
+    err = s.repo.PostAnswer(ctx, req.QuestionID, answer)
+    if err != nil {
+        return &contentPB.PostAnswerByQuestionIDResponse{
+            Success: false,
+            Message: "Failed to post answer: " + err.Error(),
+        }, err
+    }
+
+    return &contentPB.PostAnswerByQuestionIDResponse{
+        Success: true,
+        Message: "Answer posted successfully",
+    }, nil
 }
 
-// PostAnswerByQuestionID implements the PostAnswerByQuestionID RPC method
-func (s *ContentService) PostAnswerByQuestionID(ctx context.Context, req *contentPB.PostAnswerByQuestionIDRequest) (*contentPB.PostAnswerByQuestionIDResponse, error) {
-	if req.QuestionID == "" || req.Answer == "" || req.UserID == "" {
-		return &contentPB.PostAnswerByQuestionIDResponse{
-			Success: false,
-			Message: "question_id, answer, and user_id are required",
-		}, errors.New("question_id, answer, and user_id are required")
-	}
+func (s *ContentService) UpvoteAnswer(ctx context.Context, req *contentPB.UpvoteAnswerByAnswerIDRequest) (*contentPB.UpvoteAnswerByAnswerIDResponse, error) {
+    if req.AnswerID == "" || req.QuestionId == "" || req.UserID == "" {
+        return &contentPB.UpvoteAnswerByAnswerIDResponse{
+            Success: false,
+            Message: "answer_id, question_id, and user_id are required",
+        }, errors.New("missing required fields")
+    }
 
-	answer := &models.Answer{
-		UserID:    req.UserID,
-		Answer:    req.Answer,
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-		Upvotes:   0,
-		Downvotes: 0,
-		IsFlagged: false,
-		Flags:     []models.Flag{},
-	}
+    // Check if user has already voted
+    hasVoted, voteType, err := s.repo.HasUserVotedOnAnswer(ctx, req.QuestionId, req.AnswerID, req.UserID)
+    if err != nil {
+        return &contentPB.UpvoteAnswerByAnswerIDResponse{
+            Success: false,
+            Message: "Failed to check voting status",
+        }, err
+    }
 
-	err := s.repo.PostAnswer(ctx, req.QuestionID, answer)
-	if err != nil {
-		return &contentPB.PostAnswerByQuestionIDResponse{
-			Success: false,
-			Message: "Failed to post answer: " + err.Error(),
-		}, err
-	}
+    if hasVoted && voteType == "upvote" {
+        return &contentPB.UpvoteAnswerByAnswerIDResponse{
+            Success: false,
+            Message: "User has already upvoted this answer",
+        }, errors.New("already upvoted")
+    }
 
-	return &contentPB.PostAnswerByQuestionIDResponse{
-		Success: true,
-		Message: "Answer posted successfully",
-	}, nil
+    // Check if user is trying to vote on their own answer
+    answerOwnerID, err := s.repo.GetAnswerOwnerID(ctx, req.QuestionId, req.AnswerID)
+    if err != nil {
+        return &contentPB.UpvoteAnswerByAnswerIDResponse{
+            Success: false,
+            Message: "Failed to verify answer ownership",
+        }, err
+    }
+
+    if answerOwnerID == req.UserID {
+        return &contentPB.UpvoteAnswerByAnswerIDResponse{
+            Success: false,
+            Message: "Cannot vote on your own answer",
+        }, errors.New("self-voting not allowed")
+    }
+
+    err = s.repo.UpvoteAnswer(ctx, req.QuestionId, req.AnswerID, req.UserID)
+    if err != nil {
+        return &contentPB.UpvoteAnswerByAnswerIDResponse{
+            Success: false,
+            Message: "Failed to upvote answer: " + err.Error(),
+        }, err
+    }
+
+    return &contentPB.UpvoteAnswerByAnswerIDResponse{
+        Success: true,
+        Message: "Answer upvoted successfully",
+    }, nil
 }
 
-// DeleteAnswerByAnswerID implements the DeleteAnswerByAnswerID RPC method
-func (s *ContentService) DeleteAnswerByAnswerID(ctx context.Context, req *contentPB.DeleteAnswerByAnswerIDRequest) (*contentPB.DeleteAnswerByAnswerIDResponse, error) {
-	if req.AnswerID == "" {
-		return &contentPB.DeleteAnswerByAnswerIDResponse{
-			Success: false,
-			Message: "answer_id is required",
-		}, errors.New("answer_id is required")
-	}
+// Helper functions
 
-	err := s.repo.DeleteAnswer(ctx, req.QuestionID, req.AnswerID)
-	if err != nil {
-		return &contentPB.DeleteAnswerByAnswerIDResponse{
-			Success: false,
-			Message: "Failed to delete answer: " + err.Error(),
-		}, err
-	}
+func validatePostQuestion(req *contentPB.PostQuestionRequest) error {
+    if req.Question == "" || req.UserID == "" {
+        return errors.New("question and user_id are required")
+    }
 
-	return &contentPB.DeleteAnswerByAnswerIDResponse{
-		Success: true,
-		Message: "Answer deleted successfully",
-	}, nil
+    if len(req.Question) < 10 {
+        return errors.New("question must be at least 10 characters long")
+    }
+
+    if len(req.Tags) > 5 {
+        return errors.New("maximum 5 tags allowed")
+    }
+
+    return nil
 }
 
-// UpvoteAnswerByAnswerID implements the UpvoteAnswerByAnswerID RPC method
-func (s *ContentService) UpvoteAnswerByAnswerID(ctx context.Context, req *contentPB.UpvoteAnswerByAnswerIDRequest) (*contentPB.UpvoteAnswerByAnswerIDResponse, error) {
-	if req.AnswerID == "" {
-		return &contentPB.UpvoteAnswerByAnswerIDResponse{
-			Success: false,
-			Message: "answer_id is required",
-		}, errors.New("answer_id is required")
-	}
+func validatePostAnswer(req *contentPB.PostAnswerByQuestionIDRequest) error {
+    if req.QuestionID == "" || req.Answer == "" || req.UserID == "" {
+        return errors.New("question_id, answer, and user_id are required")
+    }
 
-	err := s.repo.UpvoteAnswer(ctx, req.QuestionId, req.AnswerID)
-	if err != nil {
-		return &contentPB.UpvoteAnswerByAnswerIDResponse{
-			Success: false,
-			Message: "Failed to upvote answer: " + err.Error(),
-		}, err
-	}
+    if len(req.Answer) < 20 {
+        return errors.New("answer must be at least 20 characters long")
+    }
 
-	return &contentPB.UpvoteAnswerByAnswerIDResponse{
-		Success: true,
-		Message: "Answer upvoted successfully",
-	}, nil
+    return nil
 }
 
-// DownvoteAnswerByAnswerID implements the DownvoteAnswerByAnswerID RPC method
-func (s *ContentService) DownvoteAnswerByAnswerID(ctx context.Context, req *contentPB.DownvoteAnswerByAnswerIDRequest) (*contentPB.DownvoteAnswerByAnswerIDResponse, error) {
-	if req.QuestionID == "" && req.AnswerID == "" {
-		return &contentPB.DownvoteAnswerByAnswerIDResponse{
-			Success: false,
-			Message: "answer_id is required",
-		}, errors.New("answer_id is required")
-	}
-
-	err := s.repo.DownvoteAnswer(ctx, req.QuestionID, req.AnswerID)
-	if err != nil {
-		return &contentPB.DownvoteAnswerByAnswerIDResponse{
-			Success: false,
-			Message: "Failed to downvote answer: " + err.Error(),
-		}, err
-	}
-
-	return &contentPB.DownvoteAnswerByAnswerIDResponse{
-		Success: true,
-		Message: "Answer downvoted successfully",
-	}, nil
+func sanitizeTags(tags []string) []string {
+    sanitized := make([]string, 0, len(tags))
+    for _, tag := range tags {
+        tag = strings.TrimSpace(strings.ToLower(tag))
+        if tag != "" && len(tag) <= 20 {
+            sanitized = append(sanitized, tag)
+        }
+    }
+    return sanitized
 }
 
-// FlagQuestion implements the FlagQuestion RPC method
-func (s *ContentService) FlagQuestion(ctx context.Context, req *contentPB.FlagQuestionRequest) (*contentPB.FlagQuestionResponse, error) {
-	if req.QuestionID == "" || req.UserID == "" || req.Reason == "" {
-		return &contentPB.FlagQuestionResponse{
-			Success: false,
-			Message: "question_id, user_id, and reason are required",
-		}, errors.New("question_id, user_id, and reason are required")
-	}
-
-	err := s.repo.FlagQuestion(ctx, req.QuestionID, req.UserID, req.Reason)
-	if err != nil {
-		return &contentPB.FlagQuestionResponse{
-			Success: false,
-			Message: "Failed to flag question: " + err.Error(),
-		}, err
-	}
-
-	return &contentPB.FlagQuestionResponse{
-		Success: true,
-		Message: "Question flagged successfully",
-	}, nil
-}
-
-// FlagAnswer implements the FlagAnswer RPC method
-func (s *ContentService) FlagAnswer(ctx context.Context, req *contentPB.FlagAnswerRequest) (*contentPB.FlagAnswerResponse, error) {
-	if req.AnswerID == "" || req.UserID == "" || req.Reason == "" {
-		return &contentPB.FlagAnswerResponse{
-			Success: false,
-			Message: "answer_id, user_id, and reason are required",
-		}, errors.New("answer_id, user_id, and reason are required")
-	}
-
-	err := s.repo.FlagAnswer(ctx, req.QuestionID, req.AnswerID, req.UserID, req.AnswerID)
-	if err != nil {
-		return &contentPB.FlagAnswerResponse{
-			Success: false,
-			Message: "Failed to flag answer: " + err.Error(),
-		}, err
-	}
-
-	return &contentPB.FlagAnswerResponse{
-		Success: true,
-		Message: "Answer flagged successfully",
-	}, nil
-}
-
-// MarkQuestionAsAnswered implements the MarkQuestionAsAnswered RPC method
-func (s *ContentService) MarkQuestionAsAnswered(ctx context.Context, req *contentPB.MarkQuestionAsAnsweredRequest) (*contentPB.MarkQuestionAsAnsweredResponse, error) {
-	if req.QuestionID == "" {
-		return &contentPB.MarkQuestionAsAnsweredResponse{
-			Success: false,
-			Message: "question_id is required",
-		}, errors.New("question_id is required")
-	}
-
-	err := s.repo.MarkQuestionAsAnswered(ctx, req.QuestionID)
-	if err != nil {
-		return &contentPB.MarkQuestionAsAnsweredResponse{
-			Success: false,
-			Message: "Failed to mark question as answered: " + err.Error(),
-		}, err
-	}
-
-	return &contentPB.MarkQuestionAsAnsweredResponse{
-		Success: true,
-		Message: "Question marked as answered successfully",
-	}, nil
-}
-
-// GetUserFeed implements the GetUserFeed RPC method
-func (s *ContentService) GetUserFeed(ctx context.Context, req *contentPB.GetUserFeedRequest) (*contentPB.GetUserFeedResponse, error) {
-	if req.UserID == "" {
-		return nil, errors.New("user_id is required")
-	}
-
-	questions, err := s.repo.GetUserFeed(ctx, req.UserID)
-	if err != nil {
-		return nil, err
-	}
-
-	pbQuestions := make([]*contentPB.Question, len(questions))
-	for i, q := range questions {
-		pbQuestions[i] = &contentPB.Question{
-			QuestionID: q.ID.Hex(),
-			Question:   q.Question,
-			UserID:     q.UserID,
-			CreatedAt:  q.CreatedAt.Unix(),
-			Tags:       q.Tags,
-			IsAnswered: q.IsAnswered,
-		}
-	}
-
-	return &contentPB.GetUserFeedResponse{
-		Questions: pbQuestions,
-	}, nil
+func convertToProtoQuestions(questions []models.Question) []*contentPB.Question {
+    protoQuestions := make([]*contentPB.Question, len(questions))
+    for i, q := range questions {
+        protoQuestions[i] = &contentPB.Question{
+            QuestionID: q.ID.Hex(),
+            Question:   q.Question,
+            UserID:     q.UserID,
+            CreatedAt:  q.CreatedAt.Unix(),
+            Tags:       q.Tags,
+            IsAnswered: q.IsAnswered,
+            Details:    q.Details,
+        }
+    }
+    return protoQuestions
 }
